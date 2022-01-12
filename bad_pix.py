@@ -2,6 +2,7 @@ import numpy as np
 from astropy.io import fits
 import os
 import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
 class bad_pix:
     def __init__(self, fits_path):
         f = fits.open(fits_path)
@@ -12,9 +13,9 @@ class bad_pix:
         f.close()
     
 
-    # @property
-    # def pixel_x(self):
-    #     return np.size(self.stack_pixels, 1)
+    @property
+    def pixel_x(self):
+        return np.size(self.stack_pixels, 1)
     
     @property
     def pixel_y(self):
@@ -24,7 +25,9 @@ class bad_pix:
     def num_frames(self):
         return np.size(self.stack_pixels, 0)
 
-    
+    def Gaussian(self,x,a,x0,sigma):
+        return a*np.exp(-(x-x0)**2/(2*sigma**2))
+
 
 
     def pixel_values(self):
@@ -39,38 +42,55 @@ class bad_pix:
         self.det_median = np.median(self.stack_pixels)
         self.det_std = np.std(self.stack_pixels)
 
-    def pixel_mask(self, sens_crit):
-        self.bad_pixel_mask = (self.pixel_rms <= np.mean(self.pixel_rms.flatten()) + sens_crit * np.std(self.pixel_rms.flatten())) & (self.pixel_rms >= np.mean(self.pixel_rms.flatten()) - sens_crit * np.std(self.pixel_rms.flatten())) # array with true for within criterion and false if not
+    def pixel_mask(self, x0, sigma, sens_crit):
+        self.bad_pixel_mask = (self.pixel_rms <= x0 + sens_crit * sigma) & (self.pixel_rms >= x0 - sens_crit * sigma) # array with true for within criterion and false if not
 
    
     #save_path = os.path.abspath(r'C:\Users\mow5307\Documents\Hannah_masking_temporary\.vscode\hist_outputs')
-    def histograms(self, save_path, run_num, sens_crit):
+    def histograms(self, save_path, run_num, sens_crit, bp_Obj):
+        #bp_Obj is a bad pixel object, e.g. bad_pix_dict['Run01']
 
         if hasattr(self, "pixel_rms"):
 
-            #pre-masking histogram
-            plt.figure('Pre-Masked Histogram')
-            plt.hist(self.pixel_rms.flatten(),bins=500,range = [-5, 30]);
-            plt.vlines(np.mean(self.pixel_rms.flatten()), 0, 10000, color = 'r')
-            plt.vlines(np.median(self.pixel_rms.flatten()), 0, 15000)
-            plt.vlines(np.mean(self.pixel_rms.flatten()) + sens_crit * np.std(self.pixel_rms.flatten()), 0, 15000, color = 'green')
-            plt.vlines(np.mean(self.pixel_rms.flatten()) - sens_crit * np.std(self.pixel_rms.flatten()), 0, 15000, color = 'green')
+            #Fit Gaussian Curve
+            y, x, _ = plt.hist(self.pixel_rms.flatten(), bins=500, range = [-5,30])
 
-            pre_mask_save = save_path + "\\" + run_num + "\\pre_mask" 
-            os.makedirs(pre_mask_save)
-            plt.savefig(pre_mask_save)
-            print("Pre-mask with rms lines histogram saved to %s"%pre_mask_save)
+            xdata = np.asarray(x[:-1])
+            ydata = np.asarray(y)
 
+            # Plot out the current state of the data and model
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+            ax.scatter(xdata, ydata)
+
+            # Executing curve_fit on data
+            popt, pcov = curve_fit(bp_Obj.Gaussian, xdata, ydata) #popt is best fit values for parameters of given model (Gaussian)
+
+            #make plot
+            yfit = self.Gaussian(xdata, popt[0], popt[1], popt[2])
+            ax.plot(xdata, yfit, c='r', label='Best fit')
+            ax.legend()
+            Gaussfit_save = save_path + "\\" + run_num + "\\Gauss_fit" 
+            os.makedirs(Gaussfit_save)
+            plt.savefig(Gaussfit_save)
+            print("Gaussian fit with saved to %s"%Gaussfit_save)
+            fig.savefig('Gaussian_fit.png')
 
         
             #post-masking histogram
             #get bad_pixel mask
             plt.figure('Post-Masked Histogram')
 
-            self.pixel_mask(sens_crit)
+            
+            #popt values are the pixels that are within the gaussian, creating a bad pixel
+            #mask for pixels that are within the gaussian but outside of the given sigma
+            self.pixel_mask(popt[1], popt[2], sens_crit)
 
             good_pix = self.pixel_rms * self.bad_pixel_mask.astype(int)
             plt.hist(good_pix.flatten(), bins=500, range = [-5,30])
+            axes = plt.gca()
+            axes.set_xlim([-5,30])
+            axes.set_ylim([0,13000])
 
             post_mask_save = save_path + "\\" + run_num + "\\post_mask"
             os.makedirs(post_mask_save)
@@ -88,18 +108,33 @@ class bad_pix:
         os.chdir(fpath)
         arr = self.stack_pixels[frame_num]
         #plt.imsave(fpath, arr, format = 'png')
+        ax = plt.gca()
+        ax.Colorscale = 'log'
         plt.imshow(arr)
         plt.savefig(fpath)
 
         #post-mask
-        fpath_post = save_path + "\\" + run_num + "\\frame" + str(frame_num) + '\\post_mask.png'
+        plt.figure('Post-masked frame')
+        fpath_post = save_path + "\\" + run_num + "\\frame" + str(frame_num) + '\\post_mask'
+        os.makedirs(fpath_post)
+        os.chdir(fpath_post)
         arr2 = self.stack_pixels[frame_num] * self.bad_pixel_mask
         #plt.imsave(fpath_post, arr2)
+        ax = plt.gca()
+        ax.Colorscale = 'log'
+        plt.imshow(arr2)
+        plt.savefig(fpath_post)
 
         #pixel_mask
-        fpath_bp = save_path + "\\" + run_num + "\\frame" + str(frame_num) + '\\bad_pix.png'
+        fpath_bp = save_path + "\\" + run_num + "\\frame" + str(frame_num) + '\\bad_pix'
+        os.makedirs(fpath_bp)
+        os.chdir(fpath_bp)
         arr3 = self.bad_pixel_mask
         #plt.imsave(fpath_bp, arr3)
+        ax = plt.gca()
+        ax.Colorscale = 'log'
+        plt.imshow(arr3)
+        plt.savefig(fpath_bp)
 
 
 
