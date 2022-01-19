@@ -136,6 +136,51 @@ class bad_pix:
         plt.imshow(arr3)
         plt.savefig(fpath_bp)
 
+    def fits(self, save_path, run_num, frame_num):
+        #pre-mask
+        fpath = save_path + "\\" + run_num + "\\frame" + str(frame_num)
+        #os.makedirs(fpath)
+        os.chdir(fpath)
+        arr = self.stack_pixels[frame_num]
+
+        #create PrimaryHDU Object from astropy
+        hdu = fits.PrimaryHDU(arr)
+
+        #create an HDUList containing primary HDU and write to new file
+        prefit_name = run_num + "_frame" + str(frame_num) + '_pre_mask.fits'
+        hdu.writeto(prefit_name)
+        hdul = fits.open(prefit_name)
+        hdr = hdul[0].header
+        hdr.update({'DetSer' : ('INSERT', 'Detector Serial Number'), 'DataObt' : ('INSERT', 'Date Data Obtained'), 'PixMObt' : ('INSERT', 'Date Pixel Mask Obtained'), 'SVR' : ('INSERT', 'Source/Voltage/Run Folder'), 'Method': ('INSERT', 'INSERT'), 'PerctBad': ('INSERT', 'Percentage of Bad Pixels'), 'Ran by': ('INSERT', 'INSERT'), 'Vr' : (1, 'Masking Program Version')})
+
+        # ax = plt.gca()
+        # ax.Colorscale = 'log'
+        # plt.imshow(arr)
+        # plt.savefig(fpath)
+
+        # #post-mask
+        # plt.figure('Post-masked frame')
+        # fpath_post = save_path + "\\" + run_num + "\\frame" + str(frame_num) + '\\post_mask'
+        # os.makedirs(fpath_post)
+        # os.chdir(fpath_post)
+        # arr2 = self.stack_pixels[frame_num] * self.bad_pixel_mask
+        # #plt.imsave(fpath_post, arr2)
+        # ax = plt.gca()
+        # ax.Colorscale = 'log'
+        # plt.imshow(arr2)
+        # plt.savefig(fpath_post)
+
+        # #pixel_mask
+        # fpath_bp = save_path + "\\" + run_num + "\\frame" + str(frame_num) + '\\bad_pix'
+        # os.makedirs(fpath_bp)
+        # os.chdir(fpath_bp)
+        # arr3 = self.bad_pixel_mask
+        # #plt.imsave(fpath_bp, arr3)
+        # ax = plt.gca()
+        # ax.Colorscale = 'log'
+        # plt.imshow(arr3)
+        # plt.savefig(fpath_bp)
+
 
 
         
