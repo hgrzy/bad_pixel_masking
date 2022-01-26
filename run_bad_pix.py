@@ -10,7 +10,7 @@ from bad_pix import bad_pix
 bad_pix_dict = dict() #dictionary of bad pixel objects
 
 os.startfile("O:")
-directory = r'O:\HCD_Data\Speedster_data\Speedster550_data\1720762\21_10_19'
+directory = r'O:\HCD_Data\Speedster_data\Speedster550_data\s21660\y21_12_03'
 for filename in os.listdir(directory):
     if fnmatch.fnmatch(filename, 'Fe55_*'):
         directory2 = directory + "\\" + filename
