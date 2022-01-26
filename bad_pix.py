@@ -11,6 +11,8 @@ class bad_pix:
         self.header = f[0].header
         self.bad_pixel_mask = np.empty_like(f[0].data[0])
         #self.ser_num = stuff from header
+        run_ind = fits_path.index('Run') #find index in path where this occurs
+        self.run_num = fits_path[run_ind : run_ind + 5]
         f.close()
     
 
@@ -48,10 +50,14 @@ class bad_pix:
 
    
     #save_path = os.path.abspath(r'C:\Users\mow5307\Documents\Hannah_masking_temporary\.vscode\hist_outputs')
-    def histograms(self, save_path, run_num, sens_crit, bp_Obj):
+    def histograms(self, save_path, sens_crit, bp_Obj):
         #bp_Obj is a bad pixel object, e.g. bad_pix_dict['Run01']
 
         if hasattr(self, "pixel_rms"):
+
+            fpath = save_path + "\\" + self.run_num  + '\\histograms'
+            os.makedirs(fpath)
+            os.chdir(fpath)
 
             #Fit Gaussian Curve
             y, x, _ = plt.hist(self.pixel_rms.flatten(), bins=500, range = [-5,30])
@@ -71,10 +77,9 @@ class bad_pix:
             yfit = self.Gaussian(xdata, popt[0], popt[1], popt[2])
             ax.plot(xdata, yfit, c='r', label='Best fit')
             ax.legend()
-            Gaussfit_save = save_path + "\\" + run_num + "\\Gauss_fit" 
-            os.makedirs(Gaussfit_save)
+            Gaussfit_save = save_path + "\\" + self.run_num + "\\histograms\\Gauss_fit" 
             plt.savefig(Gaussfit_save)
-            print("Gaussian fit with saved to %s"%Gaussfit_save)
+            print("Gaussian fit saved to %s"%Gaussfit_save)
             fig.savefig('Gaussian_fit.png')
 
         
@@ -93,18 +98,23 @@ class bad_pix:
             axes.set_xlim([-5,30])
             axes.set_ylim([0,13000])
 
-            post_mask_save = save_path + "\\" + run_num + "\\post_mask"
-            os.makedirs(post_mask_save)
+            post_mask_save = save_path + "\\" + self.run_num + "\\histograms\\post_mask"
             plt.savefig(post_mask_save)
             print("Post-mask histogram saved to %s"%post_mask_save)
         else:
             print("Pixel values have not been evaluated yet. Please run pixel_values() first.")
 
 
-    def plots(self, save_path, run_num, frame_num):
-        #pre-mask
+    def plots(self, save_path, frame_num):
+      
+        plotspath = save_path + "\\" + self.run_num + "\\frame" + str(frame_num) + "\\plots"
+        os.makedirs(plotspath)
+        os.chdir(plotspath)
+
+        
+
         plt.figure('Pre-masked frame')
-        fpath = save_path + "\\" + run_num + "\\frame" + str(frame_num) + '\\aFile'
+        fpath = plotspath + '\\pre_mask'
         os.makedirs(fpath)
         os.chdir(fpath)
         arr = self.stack_pixels[frame_num]
@@ -113,10 +123,11 @@ class bad_pix:
         ax.Colorscale = 'log'
         plt.imshow(arr)
         plt.savefig(fpath)
+        print("Pre-mask plot saved to %s"%fpath)
 
         #post-mask
         plt.figure('Post-masked frame')
-        fpath_post = save_path + "\\" + run_num + "\\frame" + str(frame_num) + '\\post_mask'
+        fpath_post = plotspath + '\\post_mask'
         os.makedirs(fpath_post)
         os.chdir(fpath_post)
         arr2 = self.stack_pixels[frame_num] * self.bad_pixel_mask
@@ -125,9 +136,10 @@ class bad_pix:
         ax.Colorscale = 'log'
         plt.imshow(arr2)
         plt.savefig(fpath_post)
+        print("Post-mask plot saved to %s"%fpath_post)
 
         #pixel_mask
-        fpath_bp = save_path + "\\" + run_num + "\\frame" + str(frame_num) + '\\bad_pix'
+        fpath_bp = plotspath + '\\bad_pix'
         os.makedirs(fpath_bp)
         os.chdir(fpath_bp)
         arr3 = self.bad_pixel_mask
@@ -136,14 +148,19 @@ class bad_pix:
         ax.Colorscale = 'log'
         plt.imshow(arr3)
         plt.savefig(fpath_bp)
+        print("Pixel mask plot saved to %s"%fpath_bp)
 
-    def fits(self, save_path, run_num, frame_num):
+    def fits(self, save_path, frame_num):
+
+        fitspath = save_path + "\\" + self.run_num + "\\frame" + str(frame_num) + "\\fits"
+        os.makedirs(fitspath)
+        os.chdir(fitspath)
 
         #PRE-MASK
 
         #file name and path
-        prefit_name = run_num + "_frame" + str(frame_num) + '_pre_mask.fits'
-        fpath = save_path + "\\" + run_num + "\\frame" + str(frame_num) + prefit_name
+        prefit_name = self.run_num + "_frame" + str(frame_num) + '_pre_mask.fits'
+        fpath = fitspath + "\\" +  prefit_name
 
         arr = self.stack_pixels[frame_num]
 
@@ -155,6 +172,7 @@ class bad_pix:
                     'DataObt' : ('INSERT', 'Date Data Obtained'),
                     'PixMObt' : ('INSERT', 'Date Pixel Mask Obtained'),
                     'SVR' : ('INSERT', 'Source/Voltage/Run Folder'),
+                    'Frame' : ('INSERT', 'Frame Number'),
                     'Method': ('INSERT', 'INSERT'),
                     'PerctBad': ('INSERT', 'Percentage of Bad Pixels'),
                     'Mask':('False', 'Bad pixel mask applied'), 
@@ -167,12 +185,13 @@ class bad_pix:
         #Create fits file with header and data
         
         fits.writeto(fpath, arr, hdr)
+        print("Pre-mask fits file saved to %s"%fpath)
 
         #POST-MASK
 
         #File name and path
-        postfit_name = run_num + "_frame" + str(frame_num) + '_post_mask.fits'
-        fpath_post = save_path + "\\" + run_num + "\\frame" + str(frame_num) + postfit_name
+        postfit_name = self.run_num + "_frame" + str(frame_num) + '_post_mask.fits'
+        fpath_post = fitspath + "\\" + postfit_name
         
         arr_post = self.stack_pixels[frame_num] * self.bad_pixel_mask
 
@@ -196,12 +215,13 @@ class bad_pix:
         #Create fits file with header and data
         
         fits.writeto(fpath_post, arr_post, hdr_post)
+        print("Post-mask fits file saved to %s"%fpath_post)
 
         #MASK
 
         #File name and path
-        maskfit_name = run_num + "_frame" + str(frame_num) + '_mask.fits'
-        fpath_mask = save_path + "\\" + run_num + "\\frame" + str(frame_num) + maskfit_name
+        maskfit_name = self.run_num + "_frame" + str(frame_num) + '_mask.fits'
+        fpath_mask = fitspath + "\\" + maskfit_name
         
         arr_mask = self.bad_pixel_mask.astype(int)
 
@@ -224,3 +244,4 @@ class bad_pix:
         #Create fits file with header and data
         
         fits.writeto(fpath_mask, arr_mask, hdr_mask)
+        print("Pixel mask fits file saved to %s"%fpath_mask)
