@@ -1,5 +1,6 @@
 import numpy as np
 from astropy.io import fits
+from astropy.io.fits import Header
 import os
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
@@ -137,51 +138,89 @@ class bad_pix:
         plt.savefig(fpath_bp)
 
     def fits(self, save_path, run_num, frame_num):
-        #pre-mask
-        fpath = save_path + "\\" + run_num + "\\frame" + str(frame_num)
-        #os.makedirs(fpath)
-        os.chdir(fpath)
+
+        #PRE-MASK
+
+        #file name and path
+        prefit_name = run_num + "_frame" + str(frame_num) + '_pre_mask.fits'
+        fpath = save_path + "\\" + run_num + "\\frame" + str(frame_num) + prefit_name
+
         arr = self.stack_pixels[frame_num]
 
-        #create PrimaryHDU Object from astropy
-        hdu = fits.PrimaryHDU(arr)
+        #Create empty Header object
+        hdr = fits.Header()
 
-        #create an HDUList containing primary HDU and write to new file
-        prefit_name = run_num + "_frame" + str(frame_num) + '_pre_mask.fits'
-        hdu.writeto(prefit_name)
-        hdul = fits.open(prefit_name)
-        hdr = hdul[0].header
-        hdr.update({'DetSer' : ('INSERT', 'Detector Serial Number'), 'DataObt' : ('INSERT', 'Date Data Obtained'), 'PixMObt' : ('INSERT', 'Date Pixel Mask Obtained'), 'SVR' : ('INSERT', 'Source/Voltage/Run Folder'), 'Method': ('INSERT', 'INSERT'), 'PerctBad': ('INSERT', 'Percentage of Bad Pixels'), 'Ran by': ('INSERT', 'INSERT'), 'Vr' : (1, 'Masking Program Version')})
-
-        # ax = plt.gca()
-        # ax.Colorscale = 'log'
-        # plt.imshow(arr)
-        # plt.savefig(fpath)
-
-        # #post-mask
-        # plt.figure('Post-masked frame')
-        # fpath_post = save_path + "\\" + run_num + "\\frame" + str(frame_num) + '\\post_mask'
-        # os.makedirs(fpath_post)
-        # os.chdir(fpath_post)
-        # arr2 = self.stack_pixels[frame_num] * self.bad_pixel_mask
-        # #plt.imsave(fpath_post, arr2)
-        # ax = plt.gca()
-        # ax.Colorscale = 'log'
-        # plt.imshow(arr2)
-        # plt.savefig(fpath_post)
-
-        # #pixel_mask
-        # fpath_bp = save_path + "\\" + run_num + "\\frame" + str(frame_num) + '\\bad_pix'
-        # os.makedirs(fpath_bp)
-        # os.chdir(fpath_bp)
-        # arr3 = self.bad_pixel_mask
-        # #plt.imsave(fpath_bp, arr3)
-        # ax = plt.gca()
-        # ax.Colorscale = 'log'
-        # plt.imshow(arr3)
-        # plt.savefig(fpath_bp)
-
-
-
+        #Dictionary with values to put in header
+        hdr_info = {'DetSer' : ('INSERT', 'Detector Serial Number'),
+                    'DataObt' : ('INSERT', 'Date Data Obtained'),
+                    'PixMObt' : ('INSERT', 'Date Pixel Mask Obtained'),
+                    'SVR' : ('INSERT', 'Source/Voltage/Run Folder'),
+                    'Method': ('INSERT', 'INSERT'),
+                    'PerctBad': ('INSERT', 'Percentage of Bad Pixels'),
+                    'Mask':('False', 'Bad pixel mask applied'), 
+                    'Ran_by': ('INSERT', 'Name of user'), 
+                    'Vr' : (1, 'Masking Program Version')}
         
+        #Update header object with info
+        hdr.update(hdr_info)
 
+        #Create fits file with header and data
+        
+        fits.writeto(fpath, arr, hdr)
+
+        #POST-MASK
+
+        #File name and path
+        postfit_name = run_num + "_frame" + str(frame_num) + '_post_mask.fits'
+        fpath_post = save_path + "\\" + run_num + "\\frame" + str(frame_num) + postfit_name
+        
+        arr_post = self.stack_pixels[frame_num] * self.bad_pixel_mask
+
+        #Create empty Header object
+        hdr_post = fits.Header()
+
+        #Dictionary with values to put in header
+        hdr_info_post = {'DetSer' : ('INSERT', 'Detector Serial Number'),
+                    'DataObt' : ('INSERT', 'Date Data Obtained'),
+                    'PixMObt' : ('INSERT', 'Date Pixel Mask Obtained'),
+                    'SVR' : ('INSERT', 'Source/Voltage/Run Folder'),
+                    'Method': ('INSERT', 'INSERT'),
+                    'PerctBad': ('INSERT', 'Percentage of Bad Pixels'),
+                    'Mask':('True', 'Bad pixel mask applied'), 
+                    'Ran_by': ('INSERT', 'Name of user'), 
+                    'Vr' : (1, 'Masking Program Version')}
+        
+        #Update header object with info
+        hdr_post.update(hdr_info_post)
+
+        #Create fits file with header and data
+        
+        fits.writeto(fpath_post, arr_post, hdr_post)
+
+        #MASK
+
+        #File name and path
+        maskfit_name = run_num + "_frame" + str(frame_num) + '_mask.fits'
+        fpath_mask = save_path + "\\" + run_num + "\\frame" + str(frame_num) + maskfit_name
+        
+        arr_mask = self.bad_pixel_mask.astype(int)
+
+        #Create empty Header object
+        hdr_mask = fits.Header()
+
+        #Dictionary with values to put in header
+        hdr_info_mask = {'DetSer' : ('INSERT', 'Detector Serial Number'),
+                    'DataObt' : ('INSERT', 'Date Data Obtained'),
+                    'PixMObt' : ('INSERT', 'Date Pixel Mask Obtained'),
+                    'SVR' : ('INSERT', 'Source/Voltage/Run Folder'),
+                    'Method': ('INSERT', 'INSERT'),
+                    'PerctBad': ('INSERT', 'Percentage of Bad Pixels'), 
+                    'Ran_by': ('INSERT', 'Name of user'), 
+                    'Vr' : (1, 'Masking Program Version')}
+        
+        #Update header object with info
+        hdr_mask.update(hdr_info_mask)
+
+        #Create fits file with header and data
+        
+        fits.writeto(fpath_mask, arr_mask, hdr_mask)
